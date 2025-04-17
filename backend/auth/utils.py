@@ -37,7 +37,29 @@ def generate_qr_code(totp_uri):
     return f"data:image/png;base64,{img_str}"
 
 
+import pyotp
+import time
+
 def verify_totp(secret, token):
-    """Verify a TOTP token against a secret"""
-    totp = pyotp.TOTP(secret)
-    return totp.verify(token)
+    """
+    Verify a TOTP token against a secret, accounting for the time difference
+    between the authenticator app (one minute behind) and the server.
+    """
+    try:
+        # Create a TOTP object
+        totp = pyotp.TOTP(secret)
+
+        # Calculate time offset: -60 sec (1 minute in the past)
+        time_offset = -60
+
+        # Get the adjusted 'client' timestamp (one minute ago)
+        adjusted_time = int(time.time()) + time_offset
+        adjusted_token = totp.at(adjusted_time)
+
+        # Verify the provided token using the adjusted time
+        # This checks if the token matches what the client would see, being 1 minute behind
+        return totp.verify(adjusted_token, for_time=adjusted_time)
+
+    except Exception as e:
+        print(f"TOTP verification error: {str(e)}")
+        return False

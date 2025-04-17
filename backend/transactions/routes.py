@@ -195,6 +195,8 @@ def verify_transaction_mfa(current_user_id):
         conn.close()
 
 
+from flask import request
+
 @transactions_bp.route('/history', methods=['GET'])
 @token_required
 def get_transaction_history(current_user_id):
@@ -214,10 +216,35 @@ def get_transaction_history(current_user_id):
 
         # Extract account IDs
         account_ids = [account['account_id'] for account in accounts]
-        # Format the list for SQL IN clause
         account_ids_str = ', '.join(['%s'] * len(account_ids))
 
-        # Get transactions where user's accounts are either source or destination
+        # --- Filtering logic ---
+        filters = []
+        params = account_ids + account_ids  # for IN clauses
+
+        # Get query parameters
+        txn_type = request.args.get('transaction_type')
+        status = request.args.get('status')
+        # Optionally: date_from = request.args.get('date_from')
+        # Optionally: date_to = request.args.get('date_to')
+
+        if txn_type and txn_type.lower() != "all":
+            filters.append("t.transaction_type = %s")
+            params.append(txn_type)
+        if status and status.lower() != "all":
+            filters.append("t.status = %s")
+            params.append(status)
+        # if date_from:
+        #     filters.append("t.transaction_date >= %s")
+        #     params.append(date_from)
+        # if date_to:
+        #     filters.append("t.transaction_date <= %s")
+        #     params.append(date_to)
+
+        filter_clause = ""
+        if filters:
+            filter_clause = " AND " + " AND ".join(filters)
+
         query = f"""
         SELECT t.*, 
                sa.account_name as source_account_name,
@@ -225,28 +252,24 @@ def get_transaction_history(current_user_id):
         FROM transactions t
         LEFT JOIN accounts sa ON t.source_account_id = sa.account_id
         LEFT JOIN accounts da ON t.destination_account_id = da.account_id
-        WHERE t.source_account_id IN ({account_ids_str}) 
-           OR t.destination_account_id IN ({account_ids_str})
+        WHERE (t.source_account_id IN ({account_ids_str}) 
+               OR t.destination_account_id IN ({account_ids_str}))
+              {filter_clause}
         ORDER BY t.transaction_date DESC
         """
 
-        # Double the account_ids list because we use it twice in the query
-        cursor.execute(query, account_ids + account_ids)
+        cursor.execute(query, params)
         transactions = cursor.fetchall()
 
-        # Process the transactions to handle non-serializable types
+        # --- Serialization ---
         serializable_transactions = []
         for transaction in transactions:
-            # Create a serializable version of each transaction
             serializable_transaction = {}
             for key, value in transaction.items():
-                # Convert datetime objects to strings
                 if isinstance(value, datetime.datetime):
                     serializable_transaction[key] = value.strftime('%Y-%m-%d %H:%M:%S')
-                # Convert Decimal objects to floats
                 elif isinstance(value, decimal.Decimal):
                     serializable_transaction[key] = float(value)
-                # Handle any other special types if needed
                 else:
                     serializable_transaction[key] = value
             serializable_transactions.append(serializable_transaction)
@@ -271,8 +294,24 @@ def get_user_accounts(current_user_id):
             (current_user_id,)
         )
         accounts = cursor.fetchall()
-
-        return jsonify(accounts), 200
+        print("============")
+        print(accounts)
+        serializable_transactions = []
+        for transaction in accounts:
+            # Create a serializable version of each transaction
+            serializable_transaction = {}
+            for key, value in transaction.items():
+                # Convert datetime objects to strings
+                if isinstance(value, datetime.datetime):
+                    serializable_transaction[key] = value.strftime('%Y-%m-%d %H:%M:%S')
+                # Convert Decimal objects to floats
+                elif isinstance(value, decimal.Decimal):
+                    serializable_transaction[key] = float(value)
+                # Handle any other special types if needed
+                else:
+                    serializable_transaction[key] = value
+            serializable_transactions.append(serializable_transaction)
+        return jsonify(serializable_transactions), 200
 
     except mysql.connector.Error as err:
         return jsonify({'error': str(err)}), 500

@@ -268,77 +268,164 @@ def render_mfa_verification(api_url, token_valid):
 def render_transaction_history(api_url, token_valid):
     st.subheader("Transaction History")
 
-    # Set up filters
-    col1, col2 = st.columns(2)
-    with col1:
-        transaction_types = ['All', 'Transfer', 'Withdrawal', 'Deposit']
-        selected_type = st.selectbox('Filter by Type', transaction_types)
-    with col2:
-        status_options = ['All', 'completed', 'pending', 'failed', 'cancelled']
-        selected_status = st.selectbox('Filter by Status', status_options)
+    # --- Filter state management ---
+    if 'selected_type' not in st.session_state:
+        st.session_state.selected_type = 'All'
+    if 'selected_status' not in st.session_state:
+        st.session_state.selected_status = 'All'
+    if 'filter_applied' not in st.session_state:
+        st.session_state.filter_applied = False
 
-    # Prepare filter params
+    # --- Filter UI ---
+    with st.form("transaction_filter_form"):
+        col1, col2 = st.columns(2)
+        with col1:
+            transaction_types = ['All', 'Transfer', 'Withdrawal', 'Deposit']
+            selected_type = st.selectbox('Filter by Type', transaction_types, index=transaction_types.index(st.session_state.selected_type))
+        with col2:
+            status_options = ['All', 'completed', 'pending', 'failed', 'cancelled']
+            selected_status = st.selectbox('Filter by Status', status_options, index=status_options.index(st.session_state.selected_status))
+        filter_button = st.form_submit_button("Apply Filter")
+
+    # Update session state on filter apply
+    if filter_button:
+        st.session_state.selected_type = selected_type
+        st.session_state.selected_status = selected_status
+        st.session_state.filter_applied = True
+
+    # Use the last applied filter for API query
     filter_params = {}
-    if selected_type != 'All':
-        filter_params['type'] = selected_type
-    if selected_status != 'All':
-        filter_params['status'] = selected_status
+    if st.session_state.selected_type != 'All':
+        filter_params['transaction_type'] = st.session_state.selected_type
+    if st.session_state.selected_status != 'All':
+        filter_params['status'] = st.session_state.selected_status
 
-    # Default demo transactions
-    transactions = [
-        {"transaction_id": 1, "source_account_id": 1, "destination_account_id": None, "amount": 200,
-         "transaction_type": "Withdrawal", "transaction_date": "2025-04-01 14:30", "description": "ATM withdrawal",
-         "status": "completed"},
-        {"transaction_id": 2, "source_account_id": None, "destination_account_id": 2, "amount": 1000,
-         "transaction_type": "Deposit", "transaction_date": "2025-04-05 09:15", "description": "Salary deposit",
-         "status": "completed"},
-        {"transaction_id": 3, "source_account_id": 1, "destination_account_id": 2, "amount": 500,
-         "transaction_type": "Transfer", "transaction_date": "2025-04-10 16:45", "description": "Savings transfer",
-         "status": "completed"}
-    ]
+    # Demo transactions (fallback)
+    transactions = []
 
-    # Try to get real transaction data if authenticated
-    if 'token' in st.session_state:
-        transactions_url = get_endpoint_url(api_url, "transactions", "history")
-        response = api_get(transactions_url, filter_params)
+    # Only fetch when filter is applied or on first load
+    if st.session_state.filter_applied or not hasattr(render_transaction_history, "has_loaded"):
+        render_transaction_history.has_loaded = True  # Static attribute to control initial load
 
-        # Process the response
-        if isinstance(response, dict) and 'error' in response:
-            st.error(f"Error fetching transactions: {response['error']}")
-            st.info("Showing demo transaction data.")
-        elif isinstance(response, dict) and 'transactions' in response:
-            transactions = response['transactions']
-            st.success("Successfully loaded your transaction data")
-        elif isinstance(response, list):
-            transactions = response
-            st.success("Successfully loaded your transaction data")
+        # Try to get real transaction data if authenticated
+        if 'token' in st.session_state:
+            transactions_url = get_endpoint_url(api_url, "transactions", "history")
+            response = api_get(transactions_url, filter_params)
+
+            if isinstance(response, dict) and 'error' in response:
+                st.error(f"Error fetching transactions: {response['error']}")
+                st.info("Showing demo transaction data.")
+            elif isinstance(response, list):
+                transactions = response
+                st.success("Successfully loaded your transaction data")
         else:
-            st.warning("Received unexpected data format from API")
-            st.info("Showing demo transaction data.")
-    else:
-        st.info("Using demo transaction data (please log in to see your actual transactions).")
+            st.info("Using demo transaction data (please log in to see your actual transactions).")
 
-    # Display transactions
+        st.session_state.filter_applied = False
+
+    # ---- Stylish Card Display ----
     if transactions:
         df = pd.DataFrame(transactions)
-
-        # Sort by date if available
         if 'transaction_date' in df.columns:
             df['transaction_date'] = pd.to_datetime(df['transaction_date'], errors='coerce')
             df = df.sort_values(by='transaction_date', ascending=False)
 
-            # Format for display
-            display_df = df.copy()
-            display_df['transaction_date'] = display_df['transaction_date'].dt.strftime('%Y-%m-%d %H:%M')
-            st.dataframe(display_df, use_container_width=True)
-        else:
-            st.dataframe(df, use_container_width=True)
+        st.markdown("""
+            <style>
+            .txn-scroll-box {
+                max-height: 500px;
+                overflow-y: auto;
+                padding-right: 8px;
+                margin-bottom: 1em;
+            }
+            .txn-card {
+                background: #f9fafb;
+                border-radius: 10px;
+                box-shadow: 0 1px 3px rgba(30,41,59,0.07);
+                padding: 1em 1.5em 0.8em 1em;
+                margin-bottom: 15px;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 1em;
+            }
+            .txn-icon {
+                font-size: 2rem;
+                margin-right: 1em;
+                width: 2.5em;
+                text-align: center;
+            }
+            .txn-desc {
+                flex: 1;
+            }
+            .txn-amount-pos {
+                color: #16a34a;
+                font-weight: 700;
+                font-size: 1.2em;
+            }
+            .txn-amount-neg {
+                color: #ef4444;
+                font-weight: 700;
+                font-size: 1.2em;
+            }
+            .txn-status {
+                padding: 0.1em 0.7em;
+                border-radius: 6px;
+                font-size: 0.9em;
+                font-weight: 500;
+                margin-left: 0.8em;
+            }
+            .txn-status.completed {background:#dcfce7; color:#15803d;}
+            .txn-status.pending {background:#fef9c3; color:#a16207;}
+            .txn-status.failed {background:#fee2e2; color:#b91c1c;}
+            .txn-status.cancelled {background:#e0e7ef; color:#64748b;}
+            @media (max-width: 600px) {
+                .txn-card {flex-direction: column; align-items: flex-start;}
+                .txn-amount-pos, .txn-amount-neg {margin-top:0.6em;}
+            }
+            </style>
+        """, unsafe_allow_html=True)
+        st.markdown('<div class="txn-scroll-box">', unsafe_allow_html=True)
 
+        for _, row in df.iterrows():
+            t_type = row.get('transaction_type', 'Other')
+            icon = {
+                "Deposit": "⬇️",
+                "Withdrawal": "⬆️",
+                "Transfer": "🔄"
+            }.get(t_type, "💸")
+            amount = row.get('amount', 0)
+            amount_class = "txn-amount-pos" if t_type == "Deposit" else "txn-amount-neg"
+            amount_prefix = "+" if t_type == "Deposit" else "-"
+            amount_str = f"{amount_prefix}{abs(amount):,.2f} HKD"
+            status = row.get('status', 'completed')
+            status_class = f"txn-status {status}"
+
+            desc = row.get('description', '')
+            date_str = row.get('transaction_date')
+            if isinstance(date_str, pd.Timestamp):
+                date_str = date_str.strftime('%Y-%m-%d %H:%M')
+
+            card_html = f"""
+                <div class="txn-card">
+                    <div class="txn-icon">{icon}</div>
+                    <div class="txn-desc">
+                        <div><strong>{t_type}</strong> &mdash; {desc}</div>
+                        <div style="color:#64748b; font-size: 0.95em;">{date_str}</div>
+                    </div>
+                    <div>
+                        <span class="{amount_class}">{amount_str}</span>
+                        <span class="{status_class}">{status.capitalize()}</span>
+                    </div>
+                </div>
+            """
+            st.markdown(card_html, unsafe_allow_html=True)
+
+        st.markdown('</div>', unsafe_allow_html=True)
         # Export option
-        if st.button("Export to CSV"):
+        with st.expander("Export Options"):
             csv = df.to_csv(index=False)
             filename = f"transaction_history_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
-
             st.download_button(
                 label="Download CSV",
                 data=csv,
@@ -347,8 +434,6 @@ def render_transaction_history(api_url, token_valid):
             )
     else:
         st.info("No transactions match the selected filters.")
-
-
 # Add this to display in sidebar if needed
 def show_log_status():
     with st.sidebar:

@@ -1,6 +1,9 @@
+import sys
+import os
+# Add the frontend directory to the path
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
 import streamlit as st
-import requests
-import json
 from pages import home, login, register, transactions, ai_assistant
 from components.sidebar import render_sidebar
 
@@ -15,7 +18,6 @@ if 'user' not in st.session_state:
 if 'token' not in st.session_state:
     st.session_state.token = None
 
-
 # Page navigation
 def navigate_to(page):
     st.session_state.page = page
@@ -27,6 +29,14 @@ st.set_page_config(
     page_icon="💰",
     layout="wide"
 )
+
+hide_streamlit_style = """
+<style>
+#MainMenu {visibility: hidden;}
+div[data-testid="stSidebarNav"] {display: none;}
+</style>
+"""
+st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
 # Render the appropriate page
 if st.session_state.user is None:

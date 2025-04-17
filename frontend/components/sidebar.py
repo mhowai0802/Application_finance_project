@@ -30,4 +30,3 @@ def render_sidebar(navigate_to):
             st.session_state.user = None
             st.session_state.token = None
             navigate_to('login')
-            st.experimental_rerun()

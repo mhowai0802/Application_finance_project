@@ -14,6 +14,8 @@ def generate_ai_response(prompt, context=None, template_name='financial_analysis
     Returns:
         str: The AI-generated response
     """
+    concise_instruction = "Answer concisely and concretely. Do not provide unnecessary detail."
+
     # Get the appropriate prompt template
     template = config.AI_PROMPT_TEMPLATES.get(template_name, '{prompt}')
 
@@ -22,6 +24,9 @@ def generate_ai_response(prompt, context=None, template_name='financial_analysis
         full_prompt = template.format(context=context, prompt=prompt)
     else:
         full_prompt = prompt
+
+    # Insert the concise instruction
+    full_prompt = f"{concise_instruction}\n{full_prompt}"
 
     # Prepare the request to Ollama
     payload = {
