@@ -4,12 +4,12 @@ from io import BytesIO
 import base64
 import config
 from PIL import Image
-
+import pyotp
+import time
 
 def generate_mfa_secret():
     """Generate a new MFA secret key"""
     return pyotp.random_base32()
-
 
 def get_totp_uri(username, secret):
     """Generate the OTP provisioning URI using config settings"""
@@ -17,7 +17,6 @@ def get_totp_uri(username, secret):
         name=username,
         issuer_name=config.MFA_ISSUER_NAME
     )
-
 
 def generate_qr_code(totp_uri):
     """Generate QR code image from TOTP URI"""
@@ -36,10 +35,6 @@ def generate_qr_code(totp_uri):
     img_str = base64.b64encode(buffered.getvalue()).decode()
     return f"data:image/png;base64,{img_str}"
 
-
-import pyotp
-import time
-
 def verify_totp(secret, token):
     """
     Verify a TOTP token against a secret, accounting for the time difference
@@ -50,7 +45,7 @@ def verify_totp(secret, token):
         totp = pyotp.TOTP(secret)
 
         # Calculate time offset: -60 sec (1 minute in the past)
-        time_offset = -60
+        time_offset = 0
 
         # Get the adjusted 'client' timestamp (one minute ago)
         adjusted_time = int(time.time()) + time_offset

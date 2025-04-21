@@ -7,18 +7,18 @@ import mysql.connector
 from mysql.connector import Error
 import pyotp
 
-# Add the parent directory to the path to import Config
+# Add the parent directory to the path to import config
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-from config import Config
+import config
 
 
 def get_db_connection():
     """Create a connection to the database"""
     return mysql.connector.connect(
-        host=Config.DB_HOST,
-        user=Config.DB_USER,
-        password=Config.DB_PASSWORD,
-        database=Config.DB_NAME
+        host=config.DB_HOST,
+        user=config.DB_USER,
+        password=config.DB_PASSWORD,
+        database=config.DB_NAME
     )
 
 

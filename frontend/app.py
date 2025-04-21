@@ -1,5 +1,6 @@
 import sys
 import os
+
 # Add the frontend directory to the path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
@@ -17,6 +18,7 @@ if 'user' not in st.session_state:
     st.session_state.user = None
 if 'token' not in st.session_state:
     st.session_state.token = None
+
 
 # Page navigation
 def navigate_to(page):

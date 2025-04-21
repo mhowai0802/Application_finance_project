@@ -31,7 +31,7 @@ def render(api_url, navigate_to):
                     if data.get('require_mfa'):
                         st.session_state.temp_user_id = data.get('user_id')
                         st.session_state.login_step = 2
-                        st.experimental_rerun()
+                        st.rerun()
                     else:
                         # No MFA required (unlikely in this app)
                         st.session_state.token = data.get('token')
@@ -62,7 +62,7 @@ def render(api_url, navigate_to):
                         "mfa_token": mfa_token
                     }
                 )
-
+                st.session_state.mfa_token = mfa_token
                 if response.status_code == 200:
                     data = response.json()
                     st.session_state.token = data.get('token')

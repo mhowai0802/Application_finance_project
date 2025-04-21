@@ -3,7 +3,10 @@ import mysql.connector
 import config
 import jwt
 from functools import wraps
-from .llama_client import generate_ai_response
+from ai.llama_client import generate_ai_response
+from ai.llm_tools import execute_tools_directly
+from langchain_core.tools import Tool
+import re
 
 ai_bp = Blueprint('ai', __name__)
 
@@ -111,3 +114,37 @@ def chat(current_user_id):
     finally:
         cursor.close()
         conn.close()
+
+
+
+@ai_bp.route('/financial_tool', methods=['POST'])
+@token_required
+def financial_tool_endpoint(current_user_id):
+    data = request.get_json()
+    query = data.get('query')
+
+    if not query:
+        return jsonify({'error': 'No query provided'}), 400
+
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    result = execute_tools_directly(query)
+    print(f"\nTool Execution Result: {result}")
+
+    try:
+        # Get user info for context
+        cursor.execute(
+            "SELECT username FROM users WHERE user_id = %s",
+            (current_user_id,)
+        )
+        user = cursor.fetchone()
+
+
+    except mysql.connector.Error as err:
+        return jsonify({'error': str(err)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+
