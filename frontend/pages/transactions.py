@@ -172,7 +172,7 @@ def render_new_transaction_form(api_url, token_valid):
                 st.rerun()
 
 
-def render_mfa_verification(api_url, token_valid):
+def render_mfa_verification(api_url, token_valid, transaction_id=''):
     st.subheader("Verify Transaction")
     st.info("Transaction initiated. Please verify with your MFA code.")
 
@@ -192,7 +192,6 @@ def render_mfa_verification(api_url, token_valid):
 
         if mfa_submitted:
             transaction_id = st.session_state.get('pending_transaction_id')
-
             # Verify with backend if authenticated
             if token_valid:
                 verify_data = {

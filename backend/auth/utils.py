@@ -45,7 +45,7 @@ def verify_totp(secret, token):
         totp = pyotp.TOTP(secret)
 
         # Calculate time offset: -60 sec (1 minute in the past)
-        time_offset = 0
+        time_offset = -60
 
         # Get the adjusted 'client' timestamp (one minute ago)
         adjusted_time = int(time.time()) + time_offset

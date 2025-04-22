@@ -5,6 +5,7 @@ import config
 from .utils import generate_mfa_secret, get_totp_uri, generate_qr_code, verify_totp
 import jwt
 import datetime
+from werkzeug.security import check_password_hash
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -100,7 +101,6 @@ def login():
     data = request.get_json()
     username = data.get('username')
     password = data.get('password')
-    print(data)
     if not all([username, password]):
         return jsonify({'error': 'Missing username or password'}), 400
 
@@ -110,12 +110,20 @@ def login():
     try:
         cursor.execute(
             "SELECT * FROM users WHERE username = %s",
-            (username, )
+            (username,)
         )
         user = cursor.fetchone()
         print(user)
         if not user:
             return jsonify({'error': 'Invalid username or password'}), 401
+
+        # Get the stored password hash
+        stored_password_hash = user.get('password_hash')  # Adjust column name if needed
+        print(stored_password_hash)
+        # Verify password using Werkzeug's check_password_hash function
+        if not check_password_hash(stored_password_hash, password):
+            return jsonify({'error': 'Invalid username or password'}), 401
+
         # Password is correct, now we need MFA
         return jsonify({
             'message': 'Password validated, MFA required',

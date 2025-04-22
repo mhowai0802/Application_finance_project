@@ -1,3 +1,4 @@
+from contextlib import nullcontext
 from typing import List
 import json
 import re
@@ -7,26 +8,17 @@ from transactions.routes import get_db_connection
 
 conn = get_db_connection()
 
-@tool
-def validate_user(user_id: int, addresses: List[str]):
-    """Validate user using historical addresses.
-
-    Args:
-        user_id (int): the user ID.
-        addresses (List[str]): Previous addresses as a list of strings.
-    """
-    return True
 
 @tool
-def withdraw_money(user_id:int, source_account: str, amount: int):
+def withdraw_money(user_id: int, source_account: str, amount: int, description: str):
     """Help user to withdraw money from an account
 
     Args:
         user_id (int): the user ID.
         source_account (str): the source account user want to withdraw from
         amount (int): the amount of money
+        description (str): the usage of the withdrawal money
     """
-
     cursor = conn.cursor(dictionary=True)
     cursor.execute(
         f"""
@@ -35,16 +27,61 @@ def withdraw_money(user_id:int, source_account: str, amount: int):
         """
     )
     source_id = cursor.fetchone()
-    print(source_id)
-    return source_id
+    source_id_number = source_id['account_id']
+    output = {
+        'source_account_id': source_id_number,
+        'destination_account_id': None,
+        'transaction_type': "Withdrawal",
+        'amount': amount,
+        'description': description
+
+    }
+    return output
+
+
+@tool
+def transfer_money(user_id: int, source_account: str, target_account: str, amount: int, description: str):
+    """Help user to transfer money from source_account to target_account
+
+    Args:
+        user_id (int): the user ID.
+        amount (int): the amount of money.
+        source_account (str): the source account user want to withdraw from
+        target_account (str): the target account user want to transfer to
+        description (str): the usage of the withdrawal money
+    """
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute(
+        f"""
+        SELECT account_id FROM accounts
+        WHERE user_id = {user_id} and account_name LIKE '%{source_account}%';
+        """
+    )
+    source_id = cursor.fetchone()['account_id']
+    cursor.execute(
+        f"""
+        SELECT account_id FROM accounts
+        WHERE user_id = {user_id} and account_name LIKE '%{target_account}%';
+        """
+    )
+    target_id = cursor.fetchone()['account_id']
+    output = {
+        'source_account_id': source_id,
+        'destination_account_id': target_id,
+        'transaction_type': "Transfer",
+        'amount': amount,
+        'description': description
+    }
+    return output
+
 
 # Define the tools
-tools = [validate_user, withdraw_money]
+tools = [transfer_money, withdraw_money]
+
 
 # Create a simple function to parse and execute the tool
 def execute_tools_directly(query):
     tool_dict = {tool.name: tool for tool in tools}
-
     # Initialize the LLM
     llm = ChatOllama(
         model="llama3.2",
@@ -102,30 +139,3 @@ def execute_tools_directly(query):
             return f"Error executing tool: {str(e)}"
 
     return "No tool execution pattern found in the response."
-
-
-
-
-# Execute
-queries = [
-    "I want to withdraw $500 from my Primary Savings (userid: 3)"
-
-]
-
-for query in queries:
-    result = execute_tools_directly(query)
-    print(f"\nTool Execution Result: {result}")
-
-
-# conn = get_db_connection()
-# cursor = conn.cursor(dictionary=True)
-#
-# cursor.execute(
-#     """
-#     INSERT INTO transactions
-#     (source_account_id, destination_account_id, amount, transaction_type, description, status)
-#     VALUES (%s, %s, %s, %s, %s, %s)
-#     """,
-#     (source_account_id, destination_account_id, amount, transaction_type, description, 'pending')
-# )
-# conn.commit()

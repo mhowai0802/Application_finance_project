@@ -11,4 +11,6 @@ requests==2.26.0
 pillow
 langchain_community
 langchain
+langchain_core
+langchain-ollama
 

@@ -122,7 +122,7 @@ def chat(current_user_id):
 def financial_tool_endpoint(current_user_id):
     data = request.get_json()
     query = data.get('query')
-
+    print(query)
     if not query:
         return jsonify({'error': 'No query provided'}), 400
 
@@ -133,13 +133,7 @@ def financial_tool_endpoint(current_user_id):
     print(f"\nTool Execution Result: {result}")
 
     try:
-        # Get user info for context
-        cursor.execute(
-            "SELECT username FROM users WHERE user_id = %s",
-            (current_user_id,)
-        )
-        user = cursor.fetchone()
-
+        return jsonify({'answer': result}), 200
 
     except mysql.connector.Error as err:
         return jsonify({'error': str(err)}), 500
